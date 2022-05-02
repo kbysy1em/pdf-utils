@@ -1,6 +1,9 @@
 #import sys
 import os
 import PyPDF2
+import re
+import sys
+from file_finder import FileFinder
 
 class Feature:
     def execute(self):
@@ -56,8 +59,14 @@ class MergeListFeature(MergeFeature):
 #==============================================================================
 class RotateFeature(Feature):
     def execute(self):
-        filename = input('File name?')
-        file = PyPDF2.PdfFileReader(open(filename, 'rb'))
+        input_file_name = input('File name?')
+
+        file_name = FileFinder.find(input_file_name)
+
+        if file_name is None:
+            sys.exit('ファイル名が不正です')
+
+        file = PyPDF2.PdfFileReader(open(file_name, 'rb'))
 
         # pageは1はじまりとする
         print('Input pages rotated (comma separated). If blank, all pages are rotated')
@@ -80,7 +89,10 @@ class RotateFeature(Feature):
                 rotation.rotate(page)
             self.output.addPage(page)
 
-        with open('rot-' + filename, 'wb') as f:
+        d_name = re.search(r'^.*\\',file_name)
+        f_name = re.search(r'[^\\]*?$',file_name)
+
+        with open(d_name.group()+'rot-' + f_name.group(), 'wb') as f:
             self.output.write(f)
 
 class Rotation:
@@ -138,4 +150,7 @@ def main():
     feature.execute()
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(e)

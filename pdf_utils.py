@@ -89,10 +89,11 @@ class RotateFeature(Feature):
                 rotation.rotate(page)
             self.output.addPage(page)
 
-        d_name = re.search(r'^.*\\',file_name)
-        f_name = re.search(r'[^\\]*?$',file_name)
-
-        with open(d_name.group()+'rot-' + f_name.group(), 'wb') as f:
+        d_name = re.search(r'^.*\\', file_name)
+        f_name = re.search(r'[^\\]*?$', file_name)
+        d_name_str = d_name.group() or ''
+            
+        with open(d_name_str + 'rot-' + f_name.group(), 'wb') as f:
             self.output.write(f)
 
 class Rotation:
@@ -109,14 +110,19 @@ class AntiClockwiseRotation(Rotation):
 #==============================================================================
 class ExtractFeature(Feature):
     def execute(self):
-        filename = input('File name?')
+        input_file_name = input('File name?')
+
+        file_name = FileFinder.find(input_file_name)
+
+        if file_name is None:
+            sys.exit('ファイル名が不正です')
 
         merger = PyPDF2.PdfFileMerger()
 
         print('If you want pages of 4th ~ 6th, input 4 and 6')
         start = int(input('Start page? '))
         end = int(input('End page? '))
-        merger.append(filename, pages=(start - 1, end))
+        merger.append(file_name, pages=(start - 1, end))
 
         # 以下ではstart=2, stop=3としている。
         # この場合、3ページ以降で4ページより前の部分が取り出され,

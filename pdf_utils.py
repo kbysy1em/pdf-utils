@@ -91,8 +91,8 @@ class RotateFeature(Feature):
 
         d_name = re.search(r'^.*\\', file_name)
         f_name = re.search(r'[^\\]*?$', file_name)
-        d_name_str = d_name.group() or ''
-            
+        d_name_str = d_name.group() if d_name is not None else ''
+
         with open(d_name_str + 'rot-' + f_name.group(), 'wb') as f:
             self.output.write(f)
 

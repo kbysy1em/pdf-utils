@@ -1,9 +1,22 @@
+#TODO: 空白のページを追加できるようにする
+# ページサイズは手入力とする
+# その際、前後のページのページサイズを参考として表示する
+
+# 基本、内部的にはゼロオリジンで処理する
+# 本のページはワンオリジンなので、入力、出力のみワンオリジンとする
+# 入力完了後は即座に-1してゼロオリジンで内部処理する
+# 出力時は直前で+1してワンオリジンとして表示する
+
 #import sys
+from decimal import *
 import os
 import PyPDF2
 import re
 import sys
 from file_finder import FileFinder
+
+def pt2mm(pt):
+    return pt / Decimal(72.0) * Decimal(25.4)
 
 class Feature:
     def execute(self):
@@ -60,7 +73,6 @@ class MergeListFeature(MergeFeature):
 class RotateFeature(Feature):
     def execute(self):
         input_file_name = input('File name?')
-
         file_name = FileFinder.find(input_file_name)
 
         if file_name is None:
@@ -107,11 +119,11 @@ class ClockwiseRotation(Rotation):
 class AntiClockwiseRotation(Rotation):
     def rotate(self, page):
         page.rotateClockwise(-90)
+
 #==============================================================================
 class ExtractFeature(Feature):
     def execute(self):
         input_file_name = input('File name?')
-
         file_name = FileFinder.find(input_file_name)
 
         if file_name is None:
@@ -137,8 +149,60 @@ class ExtractFeature(Feature):
         merger.close()
 
 #==============================================================================
+class InsertBlankFeature(Feature):
+    def execute(self):
+        input_file_name = input('File name?')
+        file_name = FileFinder.find(input_file_name)
+
+        if file_name is None:
+            sys.exit('ファイル名が不正です')
+
+        reader = PyPDF2.PdfReader(file_name)
+
+        # len(reader.pages)でページ数が得られる。
+        # これはワンオリジンで数えた場合の最終ページのページ番号と一致する
+        p_1origin = int(input(
+            'Input page number bhind of which blank page is inserted. '
+            f'Num of pages = {len(reader.pages)}\n'
+        ))
+        p = p_1origin - 1
+        page_nums = [i for i in range(p - 2, p + 4) if i >= 0 and i < len(reader.pages)]
+
+        # print page size
+        for i in page_nums:
+            print('page: {}; height: {}pt, {:.6f}mm; width: {}pt, {:.6f}mm'.format(
+                i + 1, 
+                reader.pages[i].mediaBox.height, pt2mm(reader.pages[i].mediaBox.height), 
+                reader.pages[i].mediaBox.width, pt2mm(reader.pages[i].mediaBox.width)
+            ))
+
+        # input blank page size
+        n_1origin = int(input('Input page number which has the desired paper size\n'))
+        n = n_1origin - 1
+
+        writer = PyPDF2.PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        
+        print(f'Blank page is inserted after page {p_1origin}. Page height {reader.pages[n].mediaBox.height}pt,'
+            f' width {reader.pages[n].mediaBox.width}pt')
+
+        writer.insert_blank_page(
+            width=reader.pages[n].mediaBox.width, 
+            height=reader.pages[n].mediaBox.height,
+            index=p + 1)
+
+        d_name = re.search(r'^.*\\', file_name)
+        f_name = re.search(r'[^\\]*?$', file_name)
+        d_name_str = d_name.group() if d_name is not None else ''
+
+        with open(d_name_str + 'bla-' + f_name.group(), 'wb') as f:
+            writer.write(f)
+
+
+#==============================================================================
 def main():
-    feature_num = input('[1]: Merge, [2]: Rotate, [3]: Extract? ')
+    feature_num = input('[1]: Merge, [2]: Rotate, [3]: Extract, [4]: InsertBlankPage? ')
 
     if feature_num == '1':
         if os.path.exists('./merge_list.txt'):
@@ -149,6 +213,8 @@ def main():
         feature = RotateFeature()
     elif feature_num == '3':
         feature = ExtractFeature()
+    elif feature_num == '4':
+        feature = InsertBlankFeature()
     else:
         print('No feature selected')
         return

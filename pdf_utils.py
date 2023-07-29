@@ -1,16 +1,15 @@
-#TODO: 空白のページを追加できるようにする
-# ページサイズは手入力とする
-# その際、前後のページのページサイズを参考として表示する
+"""PDFファイルの結合、回転、抽出
 
-# 基本、内部的にはゼロオリジンで処理する
-# 本のページはワンオリジンなので、入力、出力のみワンオリジンとする
-# 入力完了後は即座に-1してゼロオリジンで内部処理する
-# 出力時は直前で+1してワンオリジンとして表示する
+内部的にはゼロオリジンで処理する
+本のページはワンオリジンなので、入力、出力のみワンオリジンとする
+入力完了後は即座に-1してゼロオリジンで内部処理する
+出力時は直前で+1してワンオリジンとして表示する
+"""
 
 #import sys
 from decimal import *
 import os
-import PyPDF2
+from pypdf import PdfWriter, PdfReader
 import re
 import sys
 from file_finder import FileFinder
@@ -25,7 +24,7 @@ class Feature:
 #==============================================================================
 class MergeFeature(Feature):
     def __init__(self):
-        self.merger = PyPDF2.PdfFileMerger()
+        self.merger = PdfWriter()
 
     def execute(self):
         pass
@@ -65,6 +64,7 @@ class MergeListFeature(MergeFeature):
     def merge_recursively(self, m):
         if self.lines == []:
             return
+        
         print('merged file: ' + self.lines[0])
         m.append(self.lines.pop(0))
         self.merge_recursively(m)
@@ -78,7 +78,7 @@ class RotateFeature(Feature):
         if file_name is None:
             sys.exit('ファイル名が不正です')
 
-        file = PyPDF2.PdfFileReader(open(file_name, 'rb'))
+        file = PdfReader(open(file_name, 'rb'))
 
         # pageは1はじまりとする
         print('Input pages rotated (comma separated). If blank, all pages are rotated')
@@ -94,7 +94,7 @@ class RotateFeature(Feature):
         else:
             rotation = ClockwiseRotation()
 
-        self.output = PyPDF2.PdfFileWriter()
+        self.output = PdfWriter()
         for i in range(file.numPages):
             page = file.getPage(i)
             if i + 1 in rotate_pages:
@@ -129,7 +129,7 @@ class ExtractFeature(Feature):
         if file_name is None:
             sys.exit('ファイル名が不正です')
 
-        merger = PyPDF2.PdfFileMerger()
+        merger = PdfWriter()
 
         print('If you want pages of 4th ~ 6th, input 4 and 6')
         start = int(input('Start page? '))
@@ -157,7 +157,7 @@ class InsertBlankFeature(Feature):
         if file_name is None:
             sys.exit('ファイル名が不正です')
 
-        reader = PyPDF2.PdfReader(file_name)
+        reader = PdfReader(file_name)
 
         # len(reader.pages)でページ数が得られる。
         # これはワンオリジンで数えた場合の最終ページのページ番号と一致する
@@ -180,7 +180,7 @@ class InsertBlankFeature(Feature):
         n_1origin = int(input('Input page number which has the desired paper size\n'))
         n = n_1origin - 1
 
-        writer = PyPDF2.PdfWriter()
+        writer = PdfWriter()
         for page in reader.pages:
             writer.add_page(page)
         

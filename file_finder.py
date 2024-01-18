@@ -1,8 +1,14 @@
 import glob
 
 class FileFinder():
+    """
+    """
     @staticmethod
     def find(file_name):
+        """
+        Exception:
+            FileNotFoundError
+        """
         if file_name == '':
             files = glob.glob('*.pdf')
 #            files.extend(glob.glob('*.PDF'))
@@ -11,5 +17,7 @@ class FileFinder():
 
         if len(files) == 1:
             return files[0]
+        elif len(files) == 0:
+            raise FileNotFoundError()
         else:
-            return None
+            raise FileNotFoundError('Multiple files detected. Unable to identify file.')

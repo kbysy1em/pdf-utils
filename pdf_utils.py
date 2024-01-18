@@ -6,211 +6,15 @@
 出力時は直前で+1してワンオリジンとして表示する
 """
 
-#import sys
-from decimal import *
-import os
-from pypdf import PdfWriter, PdfReader
-import re
-import sys
+import commands
 from collections import OrderedDict
 from file_finder import FileFinder
 
-def pt2mm(pt):
-    return pt / Decimal(72.0) * Decimal(25.4)
-
-class Feature:
-    def execute(self):
-        pass
-
-#==============================================================================
-class MergeFeature(Feature):
-    def __init__(self):
-        self.merger = PdfWriter()
-        self.data = []
-
-    def execute(self):
-        pass
-
-class MergeOneByOneFeature(MergeFeature):
-    def execute(self, data):
-        self.data = data
-        self.merge_recursively(self.merger)
-
-        # 挿入の場合はこちら(挿入したいページを0始まりで入力)
-        #merger.merge(2, '')
-
-        self.merger.write('merged.pdf')
-        self.merger.close()
-
-        return 'Done.'
-
-    def merge_recursively(self, m):
-        if self.data == []:
-            return
-        
-        print('merged file: ' + self.data[0])
-        m.append(self.data.pop(0))
-        self.merge_recursively(m)
-
-class MergeListFeature(MergeFeature):
-    def execute(self):
-        with open('./merge_list.txt', 'rt', encoding='utf-8') as f:
-            self.lines = f.read().splitlines()
-
-        self.merge_recursively(self.merger)
-
-        # 挿入の場合はこちら(挿入したいページを0始まりで入力)
-        #merger.merge(2, '')
-
-        self.merger.write('merged.pdf')
-        self.merger.close()
-
-        return 'Done.'
-        
-    def merge_recursively(self, m):
-        if self.lines == []:
-            return
-        
-        print('merged file: ' + self.lines[0])
-        m.append(self.lines.pop(0))
-        self.merge_recursively(m)
-
-#==============================================================================
-class RotateFeature(Feature):
-    def execute(self):
-        input_file_name = input('File name?')
-        file_name = FileFinder.find(input_file_name)
-
-        if file_name is None:
-            sys.exit('ファイル名が不正です')
-
-        file = PdfReader(open(file_name, 'rb'))
-
-        # pageは1はじまりとする
-        print('Input pages rotated (comma separated). If blank, all pages are rotated')
-        s = input()
-        if not s:
-            rotate_pages = range(1, file.numPages + 1)
-        else:
-            rotate_pages = [int(x.strip()) for x in s.split(',')]
-
-        direction = input('Clockwise(y/n)?')
-        if direction == 'n':
-            rotation = AntiClockwiseRotation()
-        else:
-            rotation = ClockwiseRotation()
-
-        self.output = PdfWriter()
-        for i in range(file.numPages):
-            page = file.getPage(i)
-            if i + 1 in rotate_pages:
-                rotation.rotate(page)
-            self.output.addPage(page)
-
-        d_name = re.search(r'^.*\\', file_name)
-        f_name = re.search(r'[^\\]*?$', file_name)
-        d_name_str = d_name.group() if d_name is not None else ''
-
-        with open(d_name_str + 'rot-' + f_name.group(), 'wb') as f:
-            self.output.write(f)
-
-class Rotation:
-    def rotate(self, page):
-        pass
-
-class ClockwiseRotation(Rotation):
-    def rotate(self, page):
-        page.rotateClockwise(90)
-
-class AntiClockwiseRotation(Rotation):
-    def rotate(self, page):
-        page.rotateClockwise(-90)
-
-#==============================================================================
-class ExtractFeature(Feature):
-    def execute(self):
-        input_file_name = input('File name?')
-        file_name = FileFinder.find(input_file_name)
-
-        if file_name is None:
-            sys.exit('Input file name is wrong.')
-
-        merger = PdfWriter()
-
-        print('If you want pages of 4th ~ 6th, input 4 and 6.')
-        start = int(input('Start page? '))
-        end = int(input('End page? '))
-        merger.append(file_name, pages=(start - 1, end))
-
-        # 以下ではstart=2, stop=3としている。
-        # この場合、3ページ以降で4ページより前の部分が取り出され,
-        # 結果的に3ページ目のみのファイルが得られる
-        # merger.append(filename, pages=(2,3))
-
-        # n = merger.getNumPages()
-        # merger.append(input_file_name, pages=(0,n))
-
-        merger.write('extracted.pdf')
-
-        merger.close()
-
-#==============================================================================
-class InsertBlankFeature(Feature):
-    def execute(self):
-        input_file_name = input('File name?')
-        file_name = FileFinder.find(input_file_name)
-
-        if file_name is None:
-            sys.exit('ファイル名が不正です')
-
-        reader = PdfReader(file_name)
-
-        # len(reader.pages)でページ数が得られる。
-        # これはワンオリジンで数えた場合の最終ページのページ番号と一致する
-        p_1origin = int(input(
-            'Input page number bhind of which blank page is inserted. '
-            f'Num of pages = {len(reader.pages)}\n'
-        ))
-        p = p_1origin - 1
-        page_nums = [i for i in range(p - 2, p + 4) if i >= 0 and i < len(reader.pages)]
-
-        # print page size
-        for i in page_nums:
-            print('page: {}; height: {}pt, {:.6f}mm; width: {}pt, {:.6f}mm'.format(
-                i + 1, 
-                reader.pages[i].mediaBox.height, pt2mm(reader.pages[i].mediaBox.height), 
-                reader.pages[i].mediaBox.width, pt2mm(reader.pages[i].mediaBox.width)
-            ))
-
-        # input blank page size
-        n_1origin = int(input('Input page number which has the desired paper size\n'))
-        n = n_1origin - 1
-
-        writer = PdfWriter()
-        for page in reader.pages:
-            writer.add_page(page)
-        
-        print(f'Blank page is inserted after page {p_1origin}. Page height {reader.pages[n].mediaBox.height}pt,'
-            f' width {reader.pages[n].mediaBox.width}pt')
-
-        writer.insert_blank_page(
-            width=reader.pages[n].mediaBox.width, 
-            height=reader.pages[n].mediaBox.height,
-            index=p + 1)
-
-        d_name = re.search(r'^.*\\', file_name)
-        f_name = re.search(r'[^\\]*?$', file_name)
-        d_name_str = d_name.group() if d_name is not None else ''
-
-        with open(d_name_str + 'bla-' + f_name.group(), 'wb') as f:
-            writer.write(f)
-
-#==============================================================================
 class Option:
     def __init__(self, name, command, prep_call=None):
-        self.name = name  # <1>
-        self.command = command  # <2>
-        self.prep_call = prep_call  # <3>
+        self.name = name
+        self.command = command
+        self.prep_call = prep_call
 
     def _handle_message(self, message):
         print(message)
@@ -239,47 +43,44 @@ def print_options(options):
         print(f'({shortcut}) {option}')
 
 def get_merge_files():
+    """Get file list for merge
+    
+    Raise:
+        FileNotFoundError
+    """
     files = []
     while True:
-        file_name = input('Merge file: ')
-        # ここでfilenameのバリデーションを行う
-        if not file_name:
+        input_file_name = input('Merge file: ')
+
+        # 入力が空文字列ならループから抜ける
+        if not input_file_name:
             break
+        
+        try:
+            file_name = FileFinder.find(input_file_name)
+        except FileNotFoundError:
+            raise
+        
         files.append(file_name)
     return files
 
+def get_rotate_directions():
+    """Get rotate directions
+    """
+    pass
+
 def main():
     options = OrderedDict({
-        '1': Option('Merge', MergeOneByOneFeature(), prep_call=get_merge_files),
-        '2': Option('Rotate', RotateFeature()),
-        '3': Option('Extract', ExtractFeature()),
-        '4': Option('Insert Blank Page', InsertBlankFeature()),
-        '5': Option('Merge by list', MergeListFeature()),
+        '1': Option('Merge', commands.MergeOneByOneCommand(), prep_call=get_merge_files),
+        '2': Option('Rotate', commands.RotateCommand()),
+        '3': Option('Extract', commands.ExtractCommand()),
+        '4': Option('Insert Blank Page', commands.InsertBlankCommand()),
+        '5': Option('Merge by list', commands.MergeListCommand()),
     })
 
     print_options(options)
     chosen_option = get_option_choice(options)
     chosen_option.choose()
-
-
-
-
-    # if feature_num == '1':
-    #     if os.path.exists('./merge_list.txt'):
-    #         feature = MergeListFeature()
-    #     else:
-    #         feature = MergeOneByOneFeature()
-    # elif feature_num == '2':
-    #     feature = RotateFeature()
-    # elif feature_num == '3':
-    #     feature = ExtractFeature()
-    # elif feature_num == '4':
-    #     feature = InsertBlankFeature()
-    # else:
-    #     print('No feature selected')
-    #     return
-
-    # feature.execute()
 
 if __name__ == '__main__':
     print('PDF file edit utility')
